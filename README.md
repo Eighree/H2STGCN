@@ -1,7 +1,4 @@
 # Beyond Homophily in Spatial-Temporal Traffic Flow Forecasting
-# H2STGCN
-
-# Adaptive Graph Convolutional Recurrent Network for Traffic Forecasting
 
 
 ## Structure:
