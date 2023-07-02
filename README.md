@@ -12,7 +12,7 @@
 
 ## Requirements
 
-Python 3.6.5, Pytorch 1.1.0, Numpy 1.16.3, argparse and configparser
+Python 3.8.11, Pytorch 1.9.0, Numpy 1.12.2, argparse and configparser
 
 
 
