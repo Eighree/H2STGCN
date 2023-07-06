@@ -18,13 +18,17 @@ class ST_Block(nn.Module):
         self.mlp2 = torch.nn.Conv2d(self.dim_in, self.dim_out, kernel_size=(1, 1),
                                     padding=(0, 0), stride=(1, 1), bias=True)
 
-    def forward(self, x, node_embedding_t, node_embedding):  # node_embedding  T, N, D
-        inner_product_t = self.p_or_n * torch.einsum('btnf,btmc->btnm',node_embedding_t[:,self.k:,:,:], node_embedding[:,self.k:,:,:])
-        A_t = torch.eye(x.shape[2]).to(node_embedding.device) + self.p_or_n * F.normalize(torch.tanh(F.relu(inner_product_t)),p=1, dim=-1)
+    def forward(self, x, node_embedding_t, node_embedding):
+        inner_product_t = self.p_or_n * torch.matmul(node_embedding_t[:,self.k:,:,:],
+                                                     node_embedding[:,self.k:,:,:].permute(0, 1, 3, 2))
+        A_t = torch.eye(x.shape[2]).to(node_embedding.device) + self.p_or_n * F.normalize(
+            torch.tanh(inner_product_t * (inner_product_t > 0.00)), p=1, dim=-1)
         x_t = x[:, :, :, self.k:]
 
-        inner_product_t_k = self.p_or_n * torch.einsum('btnf,btmc->btnm',node_embedding_t[:,:(self.input_window-self.k),:,:], node_embedding[:,self.k:,:,:])
-        A_t_k = torch.eye(x.shape[2]).to(node_embedding.device) + self.p_or_n * F.normalize(torch.tanh(F.relu(inner_product_t_k)),p=1, dim=-1)
+        inner_product_t_k = self.p_or_n * torch.matmul(node_embedding_t[:,:(self.input_window - self.k),:,:],
+                                                       node_embedding[:,self.k:,:,:].permute(0, 1, 3, 2))
+        A_t_k = torch.eye(x.shape[2]).to(node_embedding.device) + self.p_or_n * F.normalize(
+            torch.tanh(inner_product_t_k * (inner_product_t_k > 0.00)), p=1, dim=-1)
         x_t_k = x[:, :, :, :(self.input_window - self.k)]
 
         out_1 = [x_t]
@@ -36,10 +40,11 @@ class ST_Block(nn.Module):
         h_2 = self.mlp2(torch.cat(out_2, dim=1))
 
         h_st = h_1 + h_2
-        #h_st = torch.cat([x[:, :, :, :self.k], h_st], dim=-1)  # keep shape B F N T
-        z_st = F.pad(h_st, [self.k, 0, 0, 0])
-        del h_st, h_1, h_2, inner_product_t_k, inner_product_t, A_t, A_t_k
-        return z_st
+        h_st = F.pad(h_st, [self.k, 0, 0, 0])
+
+        return h_st
+
+
 
 class TEmbedding(nn.Module):
     '''
@@ -64,6 +69,8 @@ class TEmbedding(nn.Module):
         TE = F.relu(self.mlp1(TE.permute(0, 2, 1)))  # B D T
         TE = F.relu(self.mlp2(TE)).permute(0, 2, 1)  # B T C
         del dayofweek, timeofday
+        return TE
+
         return TE
 
 
@@ -104,10 +111,7 @@ class H2STGCN(nn.Module):
 
         self.layers = [1, 2, 4, 4]
 
-        self.tembedding = TEmbedding(args.hideen_dim, args.candidate_group)
-
-        self.temp = nn.Parameter(torch.randn(args.horizon, self.candidate_group).to(self.device),
-                                 requires_grad=True).to(self.device)
+        self.tembedding = TEmbedding(args.hideen_dim*2, args.candidate_group)
 
         self.p_interaction = nn.Parameter(torch.randn(self.embed_dim, self.embed_dim).to(self.device),
                                           requires_grad=True).to(self.device)
@@ -141,8 +145,10 @@ class H2STGCN(nn.Module):
 
 
         for i in self.layers:
-            self.filter_similar.append(ST_Block(i, self.residual_dim, self.dilation_dim * 2, self.input_window, p_or_n=1))
-            self.filter_compete.append(ST_Block(i, self.residual_dim, self.dilation_dim * 2, self.input_window, p_or_n=-1))
+            self.filter_similar.append(
+                ST_Block(i, self.residual_dim, self.dilation_dim * 2, self.input_window, p_or_n=1))
+            self.filter_compete.append(
+                ST_Block(i, self.residual_dim, self.dilation_dim * 2, self.input_window, p_or_n=-1))
 
             self.mix_compete.append(MSC(self.dilation_dim))
             self.mix_similar.append(MSC(self.dilation_dim))
@@ -166,8 +172,6 @@ class H2STGCN(nn.Module):
             self.bn_compete.append(nn.BatchNorm2d(self.residual_dim))
             self.bn_mix.append(nn.BatchNorm2d(self.residual_dim))
 
-
-
         self.end_conv_1 = nn.Conv2d(in_channels=self.skip_dim,
                                     out_channels=self.end_dim,
                                     kernel_size=(1, 1),
@@ -178,8 +182,8 @@ class H2STGCN(nn.Module):
                                     bias=True)
 
     def forward(self, source, targets, teacher_forcing_ratio=0.5):
-        inputs = source[:,:,:,0:1]
-        te = source[:,:,1,1:]
+        inputs = source[:, :, :, 0:1]
+        te = source[:, :, 1, 1:]  # B T C
         inputs = inputs.permute(0, 3, 2, 1)
         x = self.start_conv(inputs)
         x_similar, x_compete = torch.split(x, self.residual_dim, dim=1)
@@ -187,9 +191,11 @@ class H2STGCN(nn.Module):
 
         skip = 0
 
-        temp = self.tembedding(te) # b t c
+        temb = self.tembedding(te) # b t c
 
-        T_embedding = torch.einsum('btc,cnf->btnf', temp, self.node_embedding)  #  B T N E
+        #temp = self.temp.repeat(32,1,1)
+
+        T_embedding = torch.einsum('btc,cnf->btnf', temb, self.node_embedding)  #  B T N E
         T_embedding_p = torch.einsum('btnf,fp->btnp', T_embedding, self.p_interaction)  # B T N E
         T_embedding_n = torch.einsum('btnf,fp->btnp', T_embedding, self.n_interaction)  # B T N E
 
