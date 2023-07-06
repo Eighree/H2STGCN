@@ -2,9 +2,9 @@
 import os
 import sys
 file_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-#os.path.abspath(__file__): D:/CODE/JSTGCN/model/Run.py
-#os.path.dirname(os.path.abspath(__file__)): D:/CODE/JSTGCN/model
-#os.path.dirname(os.path.dirname(os.path.abspath(__file__))): D:/CODE/JSTGCN
+#os.path.abspath(__file__): D:/CODE/H2STGCN/model/Run.py
+#os.path.dirname(os.path.abspath(__file__)): D:/CODE/H2STGCN/model
+#os.path.dirname(os.path.dirname(os.path.abspath(__file__))): D:/CODE/H2STGCN
 #os.path.abspath(__file__): 获取当前脚本的完整路径；os.path.dirname(path): 去掉文件名，返回目录
 print(file_dir)
 sys.path.append(file_dir)
@@ -15,7 +15,7 @@ import torch.nn as nn
 import argparse
 import configparser
 from datetime import datetime
-from model.JSTGCN import JSTGCN as Network
+from model.H2STGCN import H2STGCN as Network
 from model.BasicTrainer import Trainer
 from lib.TrainInits import init_seed
 from lib.dataloader import get_dataloader
@@ -27,7 +27,7 @@ Mode = 'Train'
 DEBUG = 'True'
 DATASET = 'PEMSD4'      #PEMSD4 or PEMSD8 or PEMSD7 OR PEMSD3
 DEVICE = 'cuda:0'
-MODEL = 'JSTGCN'
+MODEL = 'H2STGCN'
 
 #get configuration
 config_file = './{}_{}.conf'.format(DATASET, MODEL)
@@ -68,6 +68,8 @@ args.add_argument('--input_dim', default=config['model']['input_dim'], type=int)
 args.add_argument('--output_dim', default=config['model']['output_dim'], type=int)
 args.add_argument('--embed_dim', default=config['model']['embed_dim'], type=int)
 args.add_argument('--rnn_units', default=config['model']['rnn_units'], type=int)
+args.add_argument('--candidate_group', default=config['model']['candidate_group'], type=int)
+args.add_argument('--hideen_dim', default=config['model']['hideen_dim'], type=int)
 args.add_argument('--num_layers', default=config['model']['num_layers'], type=int)
 args.add_argument('--cheb_k', default=config['model']['cheb_order'], type=int)
 args.add_argument('--blocks', default=config['model']['blocks'], type=int)
