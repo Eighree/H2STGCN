@@ -43,9 +43,9 @@ class Trainer(object):
 
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(val_dataloader):
-                data = data[..., :self.args.input_dim]
+                data = data[..., :self.args.input_dim+2]
                 label = target[..., :self.args.output_dim]
-                output, _, _ = self.model(data, target, teacher_forcing_ratio=0.)
+                output = self.model(data, target, teacher_forcing_ratio=0.)
                 if self.args.real_value:
                     label = self.scaler.inverse_transform(label)
                 loss = self.loss(output.cuda(), label)
@@ -60,7 +60,7 @@ class Trainer(object):
         self.model.train()
         total_loss = 0
         for batch_idx, (data, target) in enumerate(self.train_loader):
-            data = data[..., :self.args.input_dim]
+            data = data[..., :self.args.input_dim+2]
             label = target[..., :self.args.output_dim]  # (..., 1)
             self.optimizer.zero_grad()
 
@@ -72,10 +72,10 @@ class Trainer(object):
             else:
                 teacher_forcing_ratio = 1.
             #data and target shape: B, T, N, F; output shape: B, T, N, F
-            output, adj_1, adj_2 = self.model(data, target, teacher_forcing_ratio=teacher_forcing_ratio)
+            output = self.model(data, target, teacher_forcing_ratio=teacher_forcing_ratio)
             if self.args.real_value:
                 label = self.scaler.inverse_transform(label)
-            loss = self.loss(output.cuda(), label) + common_loss(adj_1, adj_2) * 1
+            loss = self.loss(output.cuda(), label)
             #loss = self.loss(output.cuda(), label) + (common_loss(adj_1, adj_2) + dependence_loss(adj_1, adj_2) * 0.4)
             loss.backward()
 
@@ -176,9 +176,9 @@ class Trainer(object):
         y_true = []
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(data_loader):
-                data = data[..., :args.input_dim]
+                data = data[..., :args.input_dim+2]
                 label = target[..., :args.output_dim]
-                output, _, _ = model(data, target, teacher_forcing_ratio=0)
+                output = model(data, target, teacher_forcing_ratio=0)
                 y_true.append(label)
                 y_pred.append(output)
         y_true = scaler.inverse_transform(torch.cat(y_true, dim=0))
