@@ -43,7 +43,7 @@ class Trainer(object):
 
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(val_dataloader):
-                data = data[..., :self.args.input_dim+2]
+                data = data
                 label = target[..., :self.args.output_dim]
                 output = self.model(data, target, teacher_forcing_ratio=0.)
                 if self.args.real_value:
@@ -60,7 +60,7 @@ class Trainer(object):
         self.model.train()
         total_loss = 0
         for batch_idx, (data, target) in enumerate(self.train_loader):
-            data = data[..., :self.args.input_dim+2]
+            data = data
             label = target[..., :self.args.output_dim]  # (..., 1)
             self.optimizer.zero_grad()
 
@@ -176,7 +176,7 @@ class Trainer(object):
         y_true = []
         with torch.no_grad():
             for batch_idx, (data, target) in enumerate(data_loader):
-                data = data[..., :args.input_dim+2]
+                data = data
                 label = target[..., :args.output_dim]
                 output = model(data, target, teacher_forcing_ratio=0)
                 y_true.append(label)
