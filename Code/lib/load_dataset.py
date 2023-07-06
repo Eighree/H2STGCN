@@ -20,4 +20,15 @@ def load_st_dataset(dataset):
     if len(data.shape) == 2:
         data = np.expand_dims(data, axis=-1)
     print('Load %s Dataset shaped: ' % dataset, data.shape, data.max(), data.min(), data.mean(), np.median(data))
-    return data
+
+    timeofday = np.zeros(shape=(data.shape[0],data.shape[1],1))
+    for i in range(data.shape[0]):
+        timeofday[i, :, 0] = i
+
+    T = int(data.shape[0]/288)
+    dayofweek = np.zeros(shape=(data.shape[0],data.shape[1],1))
+    for i in range(T):
+        dayofweek[i * 288:(i + 1) * 288, :, 0] = i
+    dayofweek[(i + 1) * 288:, :] = T
+
+    return np.concatenate((data,dayofweek,timeofday),axis=-1)
