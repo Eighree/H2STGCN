@@ -31,8 +31,8 @@ def normalize_dataset(data, normalizer, column_wise=False):
             mean = data.mean(axis=0, keepdims=True)
             std = data.std(axis=0, keepdims=True)
         else:
-            mean = data.mean()
-            std = data.std()
+            mean = data[..., 0:1].mean()
+            std = data[..., 0:1].std()
         scaler = StandardScaler(mean, std)
         data = scaler.transform(data)
         print('Normalize the dataset by Standard Normalization')
