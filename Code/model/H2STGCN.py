@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 
 class ST_Block(nn.Module):
     def __init__(self, k, dim_in, dim_out, input_window, p_or_n, order=2):
@@ -46,58 +45,6 @@ class ST_Block(nn.Module):
         return h_st
 
 
-class conv2d_(nn.Module):
-    def __init__(self, input_dims, output_dims, kernel_size, stride=(1, 1),
-                 padding='SAME', use_bias=True, activation=F.relu,
-                 bn_decay=None):
-        super(conv2d_, self).__init__()
-        self.activation = activation
-        if padding == 'SAME':
-            self.padding_size = math.ceil(kernel_size)
-        else:
-            self.padding_size = [0, 0]
-        self.conv = nn.Conv2d(input_dims, output_dims, kernel_size, stride=stride,
-                              padding=0, bias=use_bias)
-        self.batch_norm = nn.BatchNorm2d(output_dims, momentum=bn_decay)
-        torch.nn.init.xavier_uniform_(self.conv.weight)
-
-        if use_bias:
-            torch.nn.init.zeros_(self.conv.bias)
-
-
-    def forward(self, x):
-        x = x.permute(0, 3, 2, 1)
-        x = F.pad(x, ([self.padding_size[1], self.padding_size[1], self.padding_size[0], self.padding_size[0]]))
-        x = self.conv(x)
-        x = self.batch_norm(x)
-        if self.activation is not None:
-            x = F.relu_(x)
-        return x.permute(0, 3, 2, 1)
-
-class FC(nn.Module):
-    def __init__(self, input_dims, units, activations, bn_decay, use_bias=True):
-        super(FC, self).__init__()
-        if isinstance(units, int):
-            units = [units]
-            input_dims = [input_dims]
-            activations = [activations]
-        elif isinstance(units, tuple):
-            units = list(units)
-            input_dims = list(input_dims)
-            activations = list(activations)
-        assert type(units) == list
-        self.convs = nn.ModuleList([conv2d_(
-            input_dims=input_dim, output_dims=num_unit, kernel_size=[1, 1], stride=[1, 1],
-            padding='VALID', use_bias=use_bias, activation=activation,
-            bn_decay=bn_decay) for input_dim, num_unit, activation in
-            zip(input_dims, units, activations)])
-
-    def forward(self, x):
-        for conv in self.convs:
-            x = conv(x)
-        return x
-
-
 
 class TEmbedding(nn.Module):
     '''
@@ -106,27 +53,25 @@ class TEmbedding(nn.Module):
     C:      candidate_group
     retrun: [batch_size, num_his, C]
     '''
-    def __init__(self, D, candidate_group, bn_decay=0.1):
+    def __init__(self, D, candidate_group):
         super(TEmbedding, self).__init__()
-
-        self.FC_te = FC(
-            input_dims=[295, D], units=[D, candidate_group], activations=[F.relu, None],
-            bn_decay=bn_decay)  # input_dims = time step per day + days per week=288+7=295
+        self.mlp1 = torch.nn.Conv1d(295, D, kernel_size=1, padding=0, bias=True)
+        self.mlp2 = torch.nn.Conv1d(D, candidate_group, kernel_size=1, padding=0, bias=True)
 
     def forward(self, TE, T=288):
-
-        # temporal embedding
-        dayofweek = torch.empty(TE.shape[0], TE.shape[1], 7)
-        timeofday = torch.empty(TE.shape[0], TE.shape[1], T)
+        dayofweek = torch.empty(TE.shape[0], TE.shape[1], 7).to(TE.device)  # B T 7
+        timeofday = torch.empty(TE.shape[0], TE.shape[1], T).to(TE.device)  # B T 288
         for i in range(TE.shape[0]):
             dayofweek[i] = F.one_hot(TE[..., 0][i].to(torch.int64) % 7, 7)
         for j in range(TE.shape[0]):
             timeofday[j] = F.one_hot(TE[..., 1][j].to(torch.int64) % 288, T)
-        TE = torch.cat((dayofweek, timeofday), dim=-1)
-        TE = TE.unsqueeze(dim=2)
-        TE = self.FC_te(TE)
+        TE = torch.cat((dayofweek, timeofday), dim=-1)  # B T 295
+        TE = F.relu(self.mlp1(TE.permute(0, 2, 1)))  # B D T
+        TE = F.relu(self.mlp2(TE)).permute(0, 2, 1)  # B T C
+        del dayofweek, timeofday
+        return TE
 
-        return TE.squeeze()
+        return TE
 
 
 class MSC(nn.Module):
