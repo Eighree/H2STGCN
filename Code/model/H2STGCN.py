@@ -22,13 +22,13 @@ class ST_Block(nn.Module):
         inner_product_t = self.p_or_n * torch.matmul(node_embedding_t[:,self.k:,:,:],
                                                      node_embedding[:,self.k:,:,:].permute(0, 1, 3, 2))
         A_t = torch.eye(x.shape[2]).to(node_embedding.device) + self.p_or_n * F.normalize(
-            torch.tanh(inner_product_t * (inner_product_t > 0.00)), p=1, dim=-1)
+            torch.tanh(inner_product_t * (inner_product_t > 0.05)), p=1, dim=-1)
         x_t = x[:, :, :, self.k:]
 
         inner_product_t_k = self.p_or_n * torch.matmul(node_embedding_t[:,:(self.input_window - self.k),:,:],
                                                        node_embedding[:,self.k:,:,:].permute(0, 1, 3, 2))
         A_t_k = torch.eye(x.shape[2]).to(node_embedding.device) + self.p_or_n * F.normalize(
-            torch.tanh(inner_product_t_k * (inner_product_t_k > 0.00)), p=1, dim=-1)
+            torch.tanh(inner_product_t_k * (inner_product_t_k > 0.05)), p=1, dim=-1)
         x_t_k = x[:, :, :, :(self.input_window - self.k)]
 
         out_1 = [x_t]
