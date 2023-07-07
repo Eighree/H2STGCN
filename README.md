@@ -3,7 +3,7 @@
 
 ## Structure:
 
-* data: including PEMSD4 and PEMSD8 dataset used in our experiments, which are released by and available at  [ASTGCN](https://github.com/Davidham3/ASTGCN/tree/master/data).
+* data: including PEMS03, PEMS04, PEMS07 and PEMS08 dataset used in our experiments, which are released by and available at [STSGCN](https://github.com/Davidham3/STSGCN).
 
 * lib: contains self-defined modules for our work, such as data loading, data pre-process, normalization, and evaluate metrics.
 
