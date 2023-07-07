@@ -18,13 +18,20 @@ class StandardScaler:
         self.std = std
 
     def transform(self, data):
-        return (data - self.mean) / self.std
+        data_flow = data[..., 0:1]
+        data_flow = (data_flow - self.mean) / self.std
+        data[..., 0:1] = data_flow
+
+        return data
 
     def inverse_transform(self, data):
         if type(data) == torch.Tensor and type(self.mean) == np.ndarray:
             self.std = torch.from_numpy(self.std).to(data.device).type(data.dtype)
             self.mean = torch.from_numpy(self.mean).to(data.device).type(data.dtype)
-        return (data * self.std) + self.mean
+        data_flow = data[..., 0:1]
+        data_flow = (data_flow * self.std) + self.mean
+        data[..., 0:1] = data_flow
+        return data
 
 class MinMax01Scaler:
     """
