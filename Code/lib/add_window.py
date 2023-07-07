@@ -23,7 +23,7 @@ def Add_Window_Horizon(data, window=3, horizon=1, single=False):
             Y.append(data[index+window:index+window+horizon])
             index = index + 1
     X = np.array(X)
-    Y = np.array(Y)[:,:,:,0:1]
+    Y = np.array(Y)
     return X, Y
 
 if __name__ == '__main__':
