@@ -138,7 +138,7 @@ class H2STGCN(nn.Module):
         self.dis_similar = nn.ModuleList()
         self.dis_compete = nn.ModuleList()
 
-        self.skip_convs = nn.ModuleList()
+        self.skip_convs = nn.Conv2d(in_channels=self.dilation_dim*4, out_channels=self.skip_dim, kernel_size=(1, 1))
         self.bn_similar = nn.ModuleList()
         self.bn_compete = nn.ModuleList()
         self.bn_mix = nn.ModuleList()
@@ -164,9 +164,6 @@ class H2STGCN(nn.Module):
                                               out_channels=self.dilation_dim,
                                               kernel_size=(1, 1)))
 
-            self.skip_convs.append(nn.Conv2d(in_channels=self.dilation_dim,
-                                             out_channels=self.skip_dim,
-                                             kernel_size=(1, 1)))
 
             self.bn_similar.append(nn.BatchNorm2d(self.residual_dim))
             self.bn_compete.append(nn.BatchNorm2d(self.residual_dim))
@@ -189,7 +186,7 @@ class H2STGCN(nn.Module):
         x_similar, x_compete = torch.split(x, self.residual_dim, dim=1)
         #x_mix = torch.zeros(x_similar.shape).cuda()
 
-        skip = 0
+        skip = []
 
         temb = self.tembedding(te) # b t c
 
@@ -224,8 +221,8 @@ class H2STGCN(nn.Module):
             x_similar = x_similar + torch.sigmoid(self.dis_similar[i](dis_similar)) * dis_similar
             x_compete = x_compete + torch.sigmoid(self.dis_compete[i](dis_compete)) * dis_compete
 
-            s = self.skip_convs[i](x_mix[:, :, :, -1:])
-            skip = skip + s
+            #s = self.skip_convs[i](x_mix[:, :, :, -1:])
+            skip.append(x_mix[:, :, :, -1:])
 
             x_similar = x_similar + residual_similar
             x_compete = x_compete + residual_compete
@@ -234,7 +231,7 @@ class H2STGCN(nn.Module):
             x_similar = self.bn_similar[i](x_similar)
             x_compete = self.bn_compete[i](x_compete)
             #x_mix = self.bn_mix[i](x_mix)
-
+        skip = self.skip_convs(torch.cat(skip, dim=1))
         x = F.relu(skip[:, :, :, -1:])
         x = F.relu(self.end_conv_1(x))
         x = self.end_conv_2(x)
